@@ -87,28 +87,76 @@ function renderProductDetails(page, product) {
     <!-- Product Details Card -->
     <div class="bg-white rounded-lg shadow-sm border overflow-hidden mb-8">
       <div class="grid grid-cols-1 lg:grid-cols-2">
-        <!-- Product Images -->
-        <div class="p-8">
-          <div class="space-y-4">
-            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group">
-              <img src="${imageUrls[0] || 'https://via.placeholder.com/500x500/f3f4f6/9ca3af?text=' + encodeURIComponent(product.name)}"
-                   alt="${product.name}"
-                   class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                   id="main-image"
-                   onerror="this.src='https://via.placeholder.com/500x500/f3f4f6/9ca3af?text=' + encodeURIComponent('${product.name}'); this.onerror=null;">
-              <div class="absolute inset-0 bg-gray-900 bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
-            </div>
-            ${imageUrls.length > 1 ? `
-              <div class="grid grid-cols-4 gap-3">
-                ${imageUrls.slice(0, 4).map((url, index) => `
-                  <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-secondary transition-all">
-                    <img src="${url}"
-                         alt="${product.name} ${index + 1}"
-                         class="w-full h-full object-cover"
-                         onclick="changeMainImage('${url}', this)"
-                         onerror="this.src='https://via.placeholder.com/150x150/f3f4f6/9ca3af?text=' + encodeURIComponent('${product.name}'); this.onerror=null;">
+        <!-- Product Images Gallery -->
+        <div class="p-4 md:p-8">
+          <div class="product-gallery">
+            <!-- Main Image Container -->
+            <div class="main-image-container relative mb-4">
+              <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative group shadow-lg">
+                <img src="${imageUrls[0] || 'https://via.placeholder.com/600x600/f3f4f6/9ca3af?text=' + encodeURIComponent(product.name)}"
+                     alt="${product.name}"
+                     class="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
+                     id="main-image"
+                     onclick="openImageModal('${imageUrls[0] || ''}', '${product.name}')"
+                     onerror="this.src='https://via.placeholder.com/600x600/f3f4f6/9ca3af?text=' + encodeURIComponent('${product.name}'); this.onerror=null;">
+
+                <!-- Image Loading Overlay -->
+                <div id="image-loading" class="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center hidden">
+                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-secondary"></div>
+                </div>
+
+                <!-- Zoom Indicator -->
+                <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <i class="fa-solid fa-search-plus mr-1"></i>
+                  Click to zoom
+                </div>
+
+                <!-- Image Counter -->
+                ${imageUrls.length > 1 ? `
+                  <div class="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm">
+                    <span id="current-image-index">1</span> / ${imageUrls.length}
                   </div>
-                `).join('')}
+                ` : ''}
+
+                <!-- Navigation Arrows for Mobile -->
+                ${imageUrls.length > 1 ? `
+                  <button class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all duration-300 md:hidden"
+                          onclick="navigateImage(-1)">
+                    <i class="fa-solid fa-chevron-left text-gray-700"></i>
+                  </button>
+                  <button class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all duration-300 md:hidden"
+                          onclick="navigateImage(1)">
+                    <i class="fa-solid fa-chevron-right text-gray-700"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Thumbnail Gallery -->
+            ${imageUrls.length > 1 ? `
+              <div class="thumbnail-gallery">
+                <div class="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  ${imageUrls.map((url, index) => `
+                    <div class="thumbnail-wrapper flex-shrink-0">
+                      <div class="thumbnail-container w-16 h-16 md:w-20 md:h-20 bg-gray-100 rounded-lg overflow-hidden cursor-pointer border-2 transition-all duration-300 hover:border-secondary hover:shadow-md ${index === 0 ? 'border-secondary shadow-md' : 'border-gray-200'}"
+                           onclick="changeMainImage('${url}', ${index}, this)">
+                        <img src="${url}"
+                             alt="${product.name} - Image ${index + 1}"
+                             class="w-full h-full object-cover transition-opacity duration-300 hover:opacity-80"
+                             loading="lazy"
+                             onerror="this.src='https://via.placeholder.com/80x80/f3f4f6/9ca3af?text=${index + 1}'; this.onerror=null;">
+
+                        <!-- Loading indicator for thumbnails -->
+                        <div class="thumbnail-loading absolute inset-0 bg-gray-200 animate-pulse hidden"></div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+
+                <!-- Thumbnail Navigation Hint -->
+                <div class="text-center mt-2 text-xs text-gray-500 md:hidden">
+                  Swipe to see more images
+                </div>
               </div>
             ` : ''}
           </div>
@@ -172,7 +220,7 @@ function renderProductDetails(page, product) {
                 <button class="px-4 py-2 hover:bg-gray-100 transition-colors" onclick="changeQuantity(-1)">
                   <i class="fa-solid fa-minus"></i>
                 </button>
-                <span class="px-6 py-2 border-x border-gray-300 font-medium" id="quantity">1</span>
+                <span class="px-6 py-2 border-x border-gray-300 font-medium" id="quantity" data-max-stock="${product.stock_quantity || 999}">1</span>
                 <button class="px-4 py-2 hover:bg-gray-100 transition-colors" onclick="changeQuantity(1)">
                   <i class="fa-solid fa-plus"></i>
                 </button>
@@ -252,36 +300,15 @@ function renderProductDetails(page, product) {
 
   page.querySelector('#product-content').innerHTML = content
 
+  // Store current product data globally for cart/wishlist functions
+  window.currentProduct = product
+
+  // Initialize image gallery functionality
+  initializeImageGallery(imageUrls)
+
   // Add global functions for interactions
-  window.changeMainImage = function(url, element) {
-    document.getElementById('main-image').src = url
-    // Update border styles
-    document.querySelectorAll('.aspect-square + div img').forEach(img => {
-      img.classList.remove('border-secondary')
-      img.classList.add('border-gray-200')
-    })
-    element.classList.remove('border-gray-200')
-    element.classList.add('border-secondary')
-  }
 
-  window.changeQuantity = function(delta) {
-    const quantityEl = document.getElementById('quantity')
-    let quantity = parseInt(quantityEl.textContent) + delta
-    if (quantity < 1) quantity = 1
-    if (quantity > product.stock) quantity = product.stock
-    quantityEl.textContent = quantity
-  }
-
-  window.addToCart = function(productId) {
-    const quantity = parseInt(document.getElementById('quantity').textContent)
-    // Here you would add to cart logic
-    showToast(`Added ${quantity} item(s) to cart!`, "success")
-  }
-
-  window.addToWishlist = function(productId) {
-    // Here you would add to wishlist logic
-    showToast("Added to wishlist!", "success")
-  }
+  // Cart and wishlist functionality will be handled by global functions below
 
   window.shareProduct = function() {
     if (navigator.share) {
@@ -518,12 +545,393 @@ function generateSessionId() {
   return 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
 }
 
+// Image Gallery Functionality
+let currentImageIndex = 0
+let galleryImages = []
+
+function initializeImageGallery(imageUrls) {
+  galleryImages = imageUrls || []
+  currentImageIndex = 0
+
+  if (galleryImages.length <= 1) return
+
+  // Add keyboard navigation
+  document.addEventListener('keydown', handleKeyboardNavigation)
+
+  // Add touch/swipe support for mobile
+  addTouchSupport()
+
+  // Preload images for better performance
+  preloadImages()
+}
+
+function handleKeyboardNavigation(event) {
+  if (event.key === 'ArrowLeft') {
+    navigateImage(-1)
+  } else if (event.key === 'ArrowRight') {
+    navigateImage(1)
+  }
+}
+
+function addTouchSupport() {
+  const mainImage = document.getElementById('main-image')
+  if (!mainImage) return
+
+  let startX = 0
+  let startY = 0
+
+  mainImage.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX
+    startY = e.touches[0].clientY
+  })
+
+  mainImage.addEventListener('touchend', (e) => {
+    if (!startX || !startY) return
+
+    const endX = e.changedTouches[0].clientX
+    const endY = e.changedTouches[0].clientY
+
+    const diffX = startX - endX
+    const diffY = startY - endY
+
+    // Only trigger if horizontal swipe is more significant than vertical
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        navigateImage(1) // Swipe left, go to next image
+      } else {
+        navigateImage(-1) // Swipe right, go to previous image
+      }
+    }
+
+    startX = 0
+    startY = 0
+  })
+}
+
+function preloadImages() {
+  galleryImages.forEach((url, index) => {
+    if (index > 0) { // Skip first image as it's already loaded
+      const img = new Image()
+      img.src = url
+    }
+  })
+}
+
+// Navigate between images
+window.navigateImage = function(direction) {
+  if (galleryImages.length <= 1) return
+
+  currentImageIndex += direction
+
+  if (currentImageIndex >= galleryImages.length) {
+    currentImageIndex = 0
+  } else if (currentImageIndex < 0) {
+    currentImageIndex = galleryImages.length - 1
+  }
+
+  const newImageUrl = galleryImages[currentImageIndex]
+  changeMainImageWithAnimation(newImageUrl, currentImageIndex)
+}
+
+// Change main image with smooth animation
+function changeMainImageWithAnimation(url, index) {
+  const mainImage = document.getElementById('main-image')
+  const loadingOverlay = document.getElementById('image-loading')
+  const imageCounter = document.getElementById('current-image-index')
+
+  if (!mainImage) return
+
+  // Show loading state
+  if (loadingOverlay) {
+    loadingOverlay.classList.remove('hidden')
+  }
+
+  // Create new image to preload
+  const newImage = new Image()
+
+  newImage.onload = function() {
+    // Hide loading state
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('hidden')
+    }
+
+    // Update main image with fade effect
+    mainImage.style.opacity = '0'
+
+    setTimeout(() => {
+      mainImage.src = url
+      mainImage.style.opacity = '1'
+
+      // Update image counter
+      if (imageCounter) {
+        imageCounter.textContent = index + 1
+      }
+
+      // Update thumbnail selection
+      updateThumbnailSelection(index)
+    }, 150)
+  }
+
+  newImage.onerror = function() {
+    // Hide loading state on error
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('hidden')
+    }
+
+    // Set fallback image
+    mainImage.src = `https://via.placeholder.com/600x600/f3f4f6/9ca3af?text=Image ${index + 1}`
+
+    // Update counter anyway
+    if (imageCounter) {
+      imageCounter.textContent = index + 1
+    }
+
+    updateThumbnailSelection(index)
+  }
+
+  newImage.src = url
+}
+
+// Update thumbnail selection styling
+function updateThumbnailSelection(activeIndex) {
+  const thumbnails = document.querySelectorAll('.thumbnail-container')
+
+  thumbnails.forEach((thumbnail, index) => {
+    if (index === activeIndex) {
+      thumbnail.classList.remove('border-gray-200')
+      thumbnail.classList.add('border-secondary', 'shadow-md')
+    } else {
+      thumbnail.classList.remove('border-secondary', 'shadow-md')
+      thumbnail.classList.add('border-gray-200')
+    }
+  })
+}
+
+// Enhanced change main image function
+window.changeMainImage = function(url, index, thumbnailElement) {
+  currentImageIndex = index
+  changeMainImageWithAnimation(url, index)
+
+  // Track image view for analytics
+  trackImageView(index)
+}
+
+// Track image views for analytics
+function trackImageView(imageIndex) {
+  try {
+    console.log(`Image ${imageIndex + 1} viewed`)
+    // TODO: Send to analytics service
+    // analyticsService.trackImageView({
+    //   product_id: currentProductId,
+    //   image_index: imageIndex,
+    //   timestamp: new Date().toISOString()
+    // })
+  } catch (error) {
+    console.error('Error tracking image view:', error)
+  }
+}
+
+// Image Modal Functionality
+window.openImageModal = function(imageUrl, productName) {
+  if (!imageUrl) return
+
+  const modal = createImageModal(imageUrl, productName)
+  document.body.appendChild(modal)
+
+  // Prevent body scroll
+  document.body.style.overflow = 'hidden'
+
+  // Focus trap for accessibility
+  modal.focus()
+}
+
+function createImageModal(imageUrl, productName) {
+  const modal = createElementFromHTML(`
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm"
+         id="image-modal"
+         onclick="closeImageModal()"
+         tabindex="0">
+      <div class="relative max-w-7xl max-h-full p-4" onclick="event.stopPropagation()">
+        <!-- Close Button -->
+        <button class="absolute top-2 right-2 z-10 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-3 transition-all duration-300"
+                onclick="closeImageModal()"
+                title="Close (ESC)">
+          <i class="fa-solid fa-times text-xl"></i>
+        </button>
+
+        <!-- Image Container -->
+        <div class="relative">
+          <img src="${imageUrl}"
+               alt="${productName}"
+               class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+               id="modal-image">
+
+          <!-- Loading Spinner -->
+          <div id="modal-loading" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+          </div>
+        </div>
+
+        <!-- Image Info -->
+        <div class="text-center mt-4 text-white">
+          <h3 class="text-lg font-semibold">${productName}</h3>
+          <p class="text-sm text-gray-300 mt-1">Click outside or press ESC to close</p>
+        </div>
+
+        <!-- Navigation Arrows (if multiple images) -->
+        ${galleryImages.length > 1 ? `
+          <button class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-3 transition-all duration-300"
+                  onclick="navigateModalImage(-1)">
+            <i class="fa-solid fa-chevron-left text-xl"></i>
+          </button>
+          <button class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-3 transition-all duration-300"
+                  onclick="navigateModalImage(1)">
+            <i class="fa-solid fa-chevron-right text-xl"></i>
+          </button>
+        ` : ''}
+      </div>
+    </div>
+  `)
+
+  // Handle image load
+  const modalImage = modal.querySelector('#modal-image')
+  const modalLoading = modal.querySelector('#modal-loading')
+
+  modalImage.onload = function() {
+    modalLoading.style.display = 'none'
+  }
+
+  modalImage.onerror = function() {
+    modalLoading.innerHTML = `
+      <div class="text-white text-center">
+        <i class="fa-solid fa-exclamation-triangle text-4xl mb-2"></i>
+        <p>Failed to load image</p>
+      </div>
+    `
+  }
+
+  // Add keyboard navigation
+  modal.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeImageModal()
+    } else if (e.key === 'ArrowLeft' && galleryImages.length > 1) {
+      navigateModalImage(-1)
+    } else if (e.key === 'ArrowRight' && galleryImages.length > 1) {
+      navigateModalImage(1)
+    }
+  })
+
+  return modal
+}
+
+window.closeImageModal = function() {
+  const modal = document.getElementById('image-modal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+window.navigateModalImage = function(direction) {
+  if (galleryImages.length <= 1) return
+
+  currentImageIndex += direction
+
+  if (currentImageIndex >= galleryImages.length) {
+    currentImageIndex = 0
+  } else if (currentImageIndex < 0) {
+    currentImageIndex = galleryImages.length - 1
+  }
+
+  const modalImage = document.getElementById('modal-image')
+  const modalLoading = document.getElementById('modal-loading')
+
+  if (modalImage && modalLoading) {
+    modalLoading.style.display = 'flex'
+    modalImage.src = galleryImages[currentImageIndex]
+
+    // Update main gallery as well
+    changeMainImageWithAnimation(galleryImages[currentImageIndex], currentImageIndex)
+  }
+}
+
+// Cleanup function
+function cleanupImageGallery() {
+  document.removeEventListener('keydown', handleKeyboardNavigation)
+  currentImageIndex = 0
+  galleryImages = []
+
+  // Close any open modals
+  const modal = document.getElementById('image-modal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+// Helper functions
+function getOrCreateSessionId() {
+  let sessionId = localStorage.getItem('session_id')
+  if (!sessionId) {
+    sessionId = generateSessionId()
+    localStorage.setItem('session_id', sessionId)
+  }
+  return sessionId
+}
+
+async function getProductIdFromSlug(slug) {
+  try {
+    // Try to get from current product data first
+    const currentProduct = window.currentProduct
+    if (currentProduct && (currentProduct.slug === slug || currentProduct.id === slug)) {
+      return currentProduct.id
+    }
+
+    // Fallback: fetch product by slug
+    const { productService } = await import('../services/api.js')
+    const product = await productService.getProductById(slug)
+    return product.id
+  } catch (error) {
+    console.error('Failed to get product ID:', error)
+    // If slug is actually an ID, return it
+    if (!isNaN(slug)) {
+      return parseInt(slug)
+    }
+    throw error
+  }
+}
+
+function updateCartCounter() {
+  if (window.cart) {
+    window.cart.loadCart()
+  } else {
+    // Update cart badge manually
+    const cartBadges = document.querySelectorAll('.cart-badge')
+    cartBadges.forEach(badge => {
+      const currentCount = parseInt(badge.textContent) || 0
+      badge.textContent = currentCount + 1
+      badge.style.display = 'block'
+    })
+  }
+}
+
+function updateWishlistCounter() {
+  // Update wishlist badge
+  const wishlistBadges = document.querySelectorAll('.wishlist-badge')
+  wishlistBadges.forEach(badge => {
+    const currentCount = parseInt(badge.textContent) || 0
+    badge.textContent = currentCount + 1
+    badge.style.display = 'block'
+  })
+}
+
 // Utility functions for product detail interactions
 window.changeQuantity = function(delta) {
   const quantityElement = document.querySelector('#quantity')
   if (quantityElement) {
     let currentQuantity = parseInt(quantityElement.textContent)
-    currentQuantity = Math.max(1, currentQuantity + delta)
+    const maxStock = parseInt(quantityElement.dataset.maxStock) || 999
+    currentQuantity = Math.max(1, Math.min(maxStock, currentQuantity + delta))
     quantityElement.textContent = currentQuantity
   }
 }
@@ -533,28 +941,58 @@ window.addToCart = async function(productSlug) {
     const quantityElement = document.querySelector('#quantity')
     const quantity = quantityElement ? parseInt(quantityElement.textContent) : 1
 
+    // Get product ID from slug
+    const productId = await getProductIdFromSlug(productSlug)
+
     if (window.cart) {
-      await window.cart.addToCart(productSlug, quantity)
+      await window.cart.addToCart(productId, quantity)
     } else {
       // Fallback to direct API call
       const { cartService } = await import('../services/api.js')
-      await cartService.addToCart(productSlug, quantity)
-      showToast(`Added ${quantity} item(s) to cart!`, 'success')
+      const sessionId = getOrCreateSessionId()
+
+      const response = await cartService.addToCart(productId, quantity, sessionId)
+
+      if (response.success || response.message) {
+        showToast(`Added ${quantity} item(s) to cart!`, 'success')
+        updateCartCounter()
+      } else {
+        throw new Error(response.error || 'Failed to add to cart')
+      }
     }
   } catch (error) {
     console.error('Failed to add to cart:', error)
-    showToast('Failed to add to cart', 'error')
+    const errorMessage = error.message || 'Failed to add to cart'
+    showToast(errorMessage, 'error')
   }
 }
 
 window.addToWishlist = async function(productSlug) {
   try {
+    // Check if user is authenticated
+    const { isAuthenticated } = store.getState()
+    if (!isAuthenticated) {
+      showToast('Please login to add items to wishlist', 'warning')
+      location.hash = '/login'
+      return
+    }
+
+    // Get product ID from slug
+    const productId = await getProductIdFromSlug(productSlug)
+
     const { cartService } = await import('../services/api.js')
-    await cartService.saveItem(productSlug)
-    showToast('Added to wishlist!', 'success')
+    const response = await cartService.saveItem(productId)
+
+    if (response.success || response.message) {
+      showToast('Added to wishlist!', 'success')
+      updateWishlistCounter()
+    } else {
+      throw new Error(response.error || 'Failed to add to wishlist')
+    }
   } catch (error) {
     console.error('Failed to add to wishlist:', error)
-    showToast('Failed to add to wishlist', 'error')
+    const errorMessage = error.message || 'Failed to add to wishlist'
+    showToast(errorMessage, 'error')
   }
 }
 

@@ -99,23 +99,14 @@ export function renderNavbar(container) {
                             <i class="fa-solid fa-search"></i>
                         </button>
                         <div class="relative">
-                            <button class="flex items-center gap-1 hover:text-blue-600 transition-colors relative" onclick="toggleCartDropdown()" title="Shopping Cart">
+                            <a href="#/cart" class="flex items-center gap-1 hover:text-blue-600 transition-colors relative" title="Shopping Cart">
                                 <i class="fa-solid fa-shopping-cart"></i>
                                 <span class="cart-badge text-xs bg-danger text-white rounded-full w-5 h-5 flex items-center justify-center absolute -top-2 -right-2" style="display: none;">0</span>
-                            </button>
-                            <!-- Cart Dropdown -->
-                            <div id="cart-dropdown" class="hidden absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                                <div class="cart-dropdown-content">
-                                    <div class="p-4 text-center text-gray-500">
-                                        <i class="fa-solid fa-shopping-cart text-3xl mb-2"></i>
-                                        <p>Your cart is empty</p>
-                                    </div>
-                                </div>
-                            </div>
+                            </a>
                         </div>
                         <a href="#/wishlist" class="flex items-center gap-1 hover:text-blue-600 transition-colors relative" title="Wishlist">
                             <i class="fa-solid fa-heart"></i>
-                            <span class="text-xs bg-danger text-white rounded-full w-5 h-5 flex items-center justify-center absolute -top-2 -right-2">0</span>
+                            <span class="wishlist-badge text-xs bg-danger text-white rounded-full w-5 h-5 flex items-center justify-center absolute -top-2 -right-2" style="display: none;">0</span>
                         </a>
                     </div>
                 </div>
@@ -174,23 +165,7 @@ export function renderNavbar(container) {
     })
   }
 
-  // Add cart dropdown functionality
-  window.toggleCartDropdown = function() {
-    const dropdown = document.getElementById("cart-dropdown")
-    if (dropdown) {
-      dropdown.classList.toggle("hidden")
-    }
-  }
-
-  // Close cart dropdown when clicking outside
-  document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById("cart-dropdown")
-    const cartButton = e.target.closest('[onclick="toggleCartDropdown()"]')
-
-    if (dropdown && !dropdown.contains(e.target) && !cartButton) {
-      dropdown.classList.add("hidden")
-    }
-  })
+  // Cart functionality is handled by direct navigation to cart page
 
   // Add global functions for navbar interactions
   window.toggleSearch = function() {

@@ -26,26 +26,45 @@ export class Cart {
   }
 
   /**
+   * Get or create session ID for guest users
+   */
+  getSessionId() {
+    let sessionId = localStorage.getItem('session_id')
+    if (!sessionId) {
+      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
+      localStorage.setItem('session_id', sessionId)
+    }
+    return sessionId
+  }
+
+  /**
    * Load cart from backend
    */
   async loadCart() {
     try {
       this.isLoading = true
-      const response = await cartService.getCart()
-      
+
+      // Get session ID for guest users
+      const sessionId = store.getState().isAuthenticated ? null : this.getSessionId()
+
+      const response = await cartService.getCart(sessionId)
+
       this.cartItems = response.items || []
       this.total = response.total_price || 0
       this.itemCount = response.total_items || 0
-      
+
       // Update store
       store.setState({ cart: this.cartItems })
-      
+
       // Update UI
       this.updateCartUI()
-      
+
     } catch (error) {
       console.error('Failed to load cart:', error)
-      showToast('Failed to load cart', 'error')
+      // Don't show error toast for initial load failures
+      if (this.cartItems.length > 0) {
+        showToast('Failed to sync cart', 'error')
+      }
     } finally {
       this.isLoading = false
     }
@@ -57,19 +76,25 @@ export class Cart {
   async addToCart(productId, quantity = 1) {
     try {
       this.isLoading = true
-      
-      const response = await cartService.addToCart(productId, quantity)
-      
-      if (response.success) {
-        showToast('Item added to cart', 'success')
+
+      // Get session ID for guest users
+      const sessionId = store.getState().isAuthenticated ? null : this.getSessionId()
+
+      const response = await cartService.addToCart(productId, quantity, sessionId)
+
+      if (response.success || response.message || response.cart) {
+        showToast(`Added ${quantity} item(s) to cart`, 'success')
         await this.loadCart() // Refresh cart
+      } else {
+        throw new Error(response.error || 'Failed to add to cart')
       }
-      
+
       return response
-      
+
     } catch (error) {
       console.error('Failed to add to cart:', error)
-      showToast('Failed to add item to cart', 'error')
+      const errorMessage = error.message || 'Failed to add item to cart'
+      showToast(errorMessage, 'error')
       throw error
     } finally {
       this.isLoading = false

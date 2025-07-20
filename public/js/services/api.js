@@ -282,26 +282,46 @@ export const productService = {
 }
 
 export const cartService = {
-  getCart: () => apiFetch("/cart/"),
-  addToCart: (productId, quantity = 1) =>
-    apiFetch("/cart/add/", {
+  getCart: (sessionId = null) => {
+    const params = sessionId ? `?session_id=${sessionId}` : ''
+    return apiFetch(`/cart/${params}`)
+  },
+  addToCart: (productId, quantity = 1, sessionId = null) => {
+    const body = { product_id: productId, quantity }
+    if (sessionId) body.session_id = sessionId
+
+    return apiFetch("/cart/add/", {
       method: "POST",
-      body: JSON.stringify({ product_id: productId, quantity }),
-    }),
-  updateCartItem: (productId, quantity) =>
-    apiFetch("/cart/update/", {
-      method: "PATCH",
-      body: JSON.stringify({ product_id: productId, quantity }),
-    }),
-  removeFromCart: (productId) =>
-    apiFetch("/cart/remove/", {
+      body: JSON.stringify(body),
+    })
+  },
+  updateCartItem: (cartItemId, quantity, sessionId = null) => {
+    const body = { cart_item_id: cartItemId, quantity }
+    if (sessionId) body.session_id = sessionId
+
+    return apiFetch("/cart/update/", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    })
+  },
+  removeFromCart: (cartItemId, sessionId = null) => {
+    const body = { cart_item_id: cartItemId }
+    if (sessionId) body.session_id = sessionId
+
+    return apiFetch("/cart/remove/", {
       method: "DELETE",
-      body: JSON.stringify({ product_id: productId }),
-    }),
-  clearCart: () =>
-    apiFetch("/cart/clear/", {
+      body: JSON.stringify(body),
+    })
+  },
+  clearCart: (sessionId = null) => {
+    const body = {}
+    if (sessionId) body.session_id = sessionId
+
+    return apiFetch("/cart/clear/", {
       method: "DELETE",
-    }),
+      body: JSON.stringify(body),
+    })
+  },
   getSavedItems: () => apiFetch("/cart/saved/"),
   saveItem: (productId, notes = "") =>
     apiFetch("/cart/save-item/", {

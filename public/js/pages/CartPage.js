@@ -41,11 +41,26 @@ function initializeCartPage(page) {
   let cartData = null
   let isLoading = false
 
+  // Get session ID for guest users
+  function getSessionId() {
+    let sessionId = localStorage.getItem('session_id')
+    if (!sessionId) {
+      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
+      localStorage.setItem('session_id', sessionId)
+    }
+    return sessionId
+  }
+
   // Load cart data
   async function loadCart() {
     try {
       isLoading = true
-      const response = await cartService.getCart()
+
+      // Get session ID for guest users
+      const { isAuthenticated } = store.getState()
+      const sessionId = isAuthenticated ? null : getSessionId()
+
+      const response = await cartService.getCart(sessionId)
       cartData = response
       renderCart()
     } catch (error) {
@@ -104,22 +119,23 @@ function initializeCartPage(page) {
         
         <!-- Quantity Controls -->
         <div class="flex items-center gap-3">
-          <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                  onclick="updateQuantity('${item.product.id}', ${item.quantity - 1})">
+          <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                  onclick="updateQuantity('${item.id}', ${item.quantity - 1})"
+                  ${item.quantity <= 1 ? 'disabled class="opacity-50 cursor-not-allowed"' : ''}>
             <i class="fa-solid fa-minus text-xs"></i>
           </button>
           <span class="w-8 text-center font-semibold">${item.quantity}</span>
-          <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                  onclick="updateQuantity('${item.product.id}', ${item.quantity + 1})">
+          <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                  onclick="updateQuantity('${item.id}', ${item.quantity + 1})">
             <i class="fa-solid fa-plus text-xs"></i>
           </button>
         </div>
-        
+
         <!-- Total Price -->
         <div class="text-right">
-          <div class="font-bold text-lg">${formatCurrency(item.price_when_added * item.quantity)}</div>
-          <button class="text-red-500 hover:text-red-700 text-sm mt-1"
-                  onclick="removeItem('${item.product.id}')">
+          <div class="font-bold text-lg">${formatCurrency(item.total_price || (item.price_when_added * item.quantity))}</div>
+          <button class="text-red-500 hover:text-red-700 text-sm mt-1 transition-colors"
+                  onclick="removeItem('${item.id}')">
             <i class="fa-solid fa-trash mr-1"></i>
             Remove
           </button>
@@ -195,28 +211,36 @@ function initializeCartPage(page) {
   }
 
   // Global functions for cart interactions
-  window.updateQuantity = async function(productId, newQuantity) {
+  window.updateQuantity = async function(cartItemId, newQuantity) {
     try {
+      const { isAuthenticated } = store.getState()
+      const sessionId = isAuthenticated ? null : getSessionId()
+
       if (window.cart) {
-        await window.cart.updateQuantity(productId, newQuantity)
+        await window.cart.updateQuantity(cartItemId, newQuantity)
       } else {
-        await cartService.updateCartItem(productId, newQuantity)
+        await cartService.updateCartItem(cartItemId, newQuantity, sessionId)
       }
       await loadCart() // Refresh cart
+      showToast('Cart updated', 'success')
     } catch (error) {
       console.error('Failed to update quantity:', error)
       showToast('Failed to update quantity', 'error')
     }
   }
 
-  window.removeItem = async function(productId) {
+  window.removeItem = async function(cartItemId) {
     try {
+      const { isAuthenticated } = store.getState()
+      const sessionId = isAuthenticated ? null : getSessionId()
+
       if (window.cart) {
-        await window.cart.removeItem(productId)
+        await window.cart.removeItem(cartItemId)
       } else {
-        await cartService.removeFromCart(productId)
+        await cartService.removeFromCart(cartItemId, sessionId)
       }
       await loadCart() // Refresh cart
+      showToast('Item removed', 'success')
     } catch (error) {
       console.error('Failed to remove item:', error)
       showToast('Failed to remove item', 'error')
@@ -226,12 +250,16 @@ function initializeCartPage(page) {
   window.clearCart = async function() {
     if (confirm('Are you sure you want to clear your cart?')) {
       try {
+        const { isAuthenticated } = store.getState()
+        const sessionId = isAuthenticated ? null : getSessionId()
+
         if (window.cart) {
           await window.cart.clearCart()
         } else {
-          await cartService.clearCart()
+          await cartService.clearCart(sessionId)
         }
         await loadCart() // Refresh cart
+        showToast('Cart cleared', 'success')
       } catch (error) {
         console.error('Failed to clear cart:', error)
         showToast('Failed to clear cart', 'error')

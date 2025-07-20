@@ -41,20 +41,23 @@ export function ProductCard(product) {
         ` : ''}
 
         <!-- Action Buttons -->
-        <div class="absolute inset-0 bg-gray-900 bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
-          <button class="bg-white p-3 rounded-full shadow-md hover:bg-secondary hover:text-white transition-colors"
-                  onclick="event.stopPropagation(); toggleWishlist('${productSlug}')"
-                  title="Add to Wishlist">
+        <div class="product-card-actions">
+          <button class="action-button ${product.is_liked ? 'wishlist-active' : ''}"
+                  onclick="event.stopPropagation(); toggleWishlist('${productSlug}', event)"
+                  title="Add to Wishlist"
+                  aria-label="Add ${product.name} to wishlist">
             <i class="fa-solid fa-heart ${product.is_liked ? 'text-red-500' : ''}"></i>
           </button>
-          <button class="bg-white p-3 rounded-full shadow-md hover:bg-secondary hover:text-white transition-colors"
-                  onclick="event.stopPropagation(); addToCart('${productSlug}')"
-                  title="Add to Cart">
+          <button class="action-button"
+                  onclick="event.stopPropagation(); addToCart('${productSlug}', event)"
+                  title="Add to Cart"
+                  aria-label="Add ${product.name} to cart">
             <i class="fa-solid fa-shopping-cart"></i>
           </button>
-          <button class="bg-white p-3 rounded-full shadow-md hover:bg-secondary hover:text-white transition-colors"
-                  onclick="event.stopPropagation(); quickView('${productSlug}')"
-                  title="Quick View">
+          <button class="action-button"
+                  onclick="event.stopPropagation(); quickView('${productSlug}', event)"
+                  title="Quick View"
+                  aria-label="View ${product.name} details">
             <i class="fa-solid fa-eye"></i>
           </button>
         </div>
@@ -109,39 +112,238 @@ export function ProductCard(product) {
   `
 }
 
-// Utility functions for product card interactions
-window.toggleWishlist = async function(productSlug) {
+// Helper functions for product card interactions
+async function getProductIdFromSlug(slug) {
   try {
+    // If slug is actually an ID, return it
+    if (!isNaN(slug)) {
+      return parseInt(slug)
+    }
+
+    // Try to get from current product data first
+    const currentProduct = window.currentProduct
+    if (currentProduct && currentProduct.slug === slug) {
+      return currentProduct.id
+    }
+
+    // Fallback: fetch product by slug
+    const { productService } = await import('../services/api.js')
+    const product = await productService.getProductById(slug)
+    return product.id
+  } catch (error) {
+    console.error('Failed to get product ID:', error)
+    throw error
+  }
+}
+
+function getOrCreateSessionId() {
+  let sessionId = localStorage.getItem('session_id')
+  if (!sessionId) {
+    sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
+    localStorage.setItem('session_id', sessionId)
+  }
+  return sessionId
+}
+
+function updateWishlistCounter() {
+  // Update wishlist badge
+  const wishlistBadges = document.querySelectorAll('.wishlist-badge')
+  wishlistBadges.forEach(badge => {
+    const currentCount = parseInt(badge.textContent) || 0
+    badge.textContent = currentCount + 1
+    badge.style.display = 'block'
+  })
+}
+
+function updateCartCounter() {
+  if (window.cart) {
+    window.cart.loadCart()
+  } else {
+    // Update cart badge manually
+    const cartBadges = document.querySelectorAll('.cart-badge')
+    cartBadges.forEach(badge => {
+      const currentCount = parseInt(badge.textContent) || 0
+      badge.textContent = currentCount + 1
+      badge.style.display = 'block'
+    })
+  }
+}
+
+// Utility functions for product card interactions
+window.toggleWishlist = async function(productSlug, event = null) {
+  let button = null
+  let originalContent = null
+
+  try {
+    // Add loading state to button
+    if (event) {
+      button = event.target.closest('button')
+      originalContent = button.innerHTML
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'
+      button.disabled = true
+    }
+
+    // Import store to check authentication
+    const store = await import('../state/store.js')
+    const { isAuthenticated } = store.default.getState()
+
+    if (!isAuthenticated) {
+      showToast('Please login to add items to wishlist', 'warning')
+      location.hash = '/login'
+      return
+    }
+
+    // Get product ID from slug
+    const productId = await getProductIdFromSlug(productSlug)
+
     // Import cart service dynamically to avoid circular dependencies
     const { cartService } = await import('../services/api.js')
 
-    // For now, use save item functionality as wishlist
-    await cartService.saveItem(productSlug)
-    showToast('Added to wishlist!', 'success')
+    const response = await cartService.saveItem(productId)
+
+    if (response.success || response.message) {
+      showToast('Added to wishlist!', 'success')
+      updateWishlistCounter()
+
+      // Update the heart icon to show it's liked
+      if (button) {
+        button.innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>'
+        button.title = 'Added to Wishlist'
+        button.classList.add('wishlist-active', 'success')
+
+        // Remove success animation after it completes
+        setTimeout(() => {
+          button.classList.remove('success')
+        }, 600)
+      }
+    } else {
+      throw new Error(response.error || 'Failed to add to wishlist')
+    }
   } catch (error) {
     console.error('Failed to add to wishlist:', error)
-    showToast('Failed to add to wishlist', 'error')
+    const errorMessage = error.message || 'Failed to add to wishlist'
+    showToast(errorMessage, 'error')
+
+    // Show error state briefly
+    if (button && originalContent) {
+      button.classList.add('error')
+      button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i>'
+
+      setTimeout(() => {
+        button.innerHTML = originalContent
+        button.disabled = false
+        button.classList.remove('error')
+      }, 1500)
+    }
+  } finally {
+    // Re-enable button if not permanently changed
+    if (button && !button.innerHTML.includes('text-red-500')) {
+      button.disabled = false
+      if (originalContent) {
+        button.innerHTML = originalContent
+      }
+    }
   }
 }
 
-window.addToCart = async function(productSlug) {
+window.addToCart = async function(productSlug, event = null) {
+  let button = null
+  let originalContent = null
+
   try {
+    // Add loading state to button
+    if (event) {
+      button = event.target.closest('button')
+      originalContent = button.innerHTML
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'
+      button.disabled = true
+    }
+
+    // Get product ID from slug
+    const productId = await getProductIdFromSlug(productSlug)
+
     // Check if cart component is available
     if (window.cart) {
-      await window.cart.addToCart(productSlug, 1)
+      await window.cart.addToCart(productId, 1)
     } else {
       // Fallback to direct API call
       const { cartService } = await import('../services/api.js')
-      await cartService.addToCart(productSlug, 1)
-      showToast('Added to cart!', 'success')
+      const store = await import('../state/store.js')
+      const { isAuthenticated } = store.default.getState()
+
+      // Get session ID for guest users
+      const sessionId = isAuthenticated ? null : getOrCreateSessionId()
+
+      const response = await cartService.addToCart(productId, 1, sessionId)
+
+      if (response.success || response.message || response.cart) {
+        showToast('Added to cart!', 'success')
+        updateCartCounter()
+
+        // Show success state briefly
+        if (button) {
+          button.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>'
+          button.classList.add('cart-success', 'success')
+
+          setTimeout(() => {
+            if (originalContent) {
+              button.innerHTML = originalContent
+              button.classList.remove('cart-success', 'success')
+            }
+          }, 1500)
+        }
+      } else {
+        throw new Error(response.error || 'Failed to add to cart')
+      }
     }
   } catch (error) {
     console.error('Failed to add to cart:', error)
-    showToast('Failed to add to cart', 'error')
+    const errorMessage = error.message || 'Failed to add to cart'
+    showToast(errorMessage, 'error')
+
+    // Show error state briefly
+    if (button && originalContent) {
+      button.classList.add('error')
+      button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i>'
+
+      setTimeout(() => {
+        button.innerHTML = originalContent
+        button.disabled = false
+        button.classList.remove('error')
+      }, 1500)
+    }
+  } finally {
+    // Re-enable button
+    if (button) {
+      button.disabled = false
+      // Only restore content if it wasn't changed to success state
+      if (button.innerHTML.includes('fa-spinner') && originalContent) {
+        button.innerHTML = originalContent
+      }
+    }
   }
 }
 
-window.quickView = function(productSlug) {
-  // Navigate to product detail page
-  location.hash = `/products/${productSlug}`
+window.quickView = function(productSlug, event = null) {
+  try {
+    // Add loading state to the button if event is provided
+    if (event) {
+      const button = event.target.closest('button')
+      const originalContent = button.innerHTML
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'
+      button.disabled = true
+
+      // Reset button after a short delay (in case navigation is slow)
+      setTimeout(() => {
+        button.innerHTML = originalContent
+        button.disabled = false
+      }, 1000)
+    }
+
+    // Navigate to product detail page
+    location.hash = `/products/${productSlug}`
+  } catch (error) {
+    console.error('Failed to navigate to product:', error)
+    showToast('Failed to open product details', 'error')
+  }
 }
